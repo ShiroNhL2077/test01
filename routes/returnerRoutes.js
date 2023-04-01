@@ -29,67 +29,75 @@ router.get("/getallreturners", async (req, res) => {
   }
 });
 
-router.get("/getreturnerbyaddress", async (req, res) => {
-  const { address } = req.query;
+router.get("/getreturnersbyaddress/:address", (req, res) => {
+  const { address } = req.params;
 
-  const filter = address
-    ? { address: { $regex: new RegExp(address, "i") } }
-    : {};
+  // Find all the data instances in the database with the given address
+  Returner.find({ address })
+    .then((returners) => {
+      if (returners.length === 0) {
+        return res
+          .status(404)
+          .json({ message: "No returners found with that address" });
+      }
 
-  try {
-    const returners = await Returner.find(filter);
-    res.json(returners);
-  } catch (error) {
-    res.status(500).json({ error });
-  }
+      // Return the data instances to the client
+      res.json(returners);
+    })
+    .catch((err) => {
+      return res.status(500).json({ error: err });
+    });
 });
+
 
 router.delete("/deletereturner/:phoneNumber", (req, res) => {
   const { phoneNumber } = req.params;
 
-  // Validate that the phone number is a valid Object ID before proceeding
-  if (!mongoose.Types.ObjectId.isValid(phoneNumber)) {
+  // Parse the phoneNumber parameter as an integer
+  const parsedPhoneNumber = parseInt(phoneNumber);
+
+  // Validate that the parsed phoneNumber is a valid number
+  if (isNaN(parsedPhoneNumber)) {
     return res.status(400).json({ message: "Invalid phone number" });
   }
 
-  // Find the data instance with the given ID and remove it from the database
-  Returner.findByIdAndRemove(phoneNumber, (err, deletedReturner) => {
-    if (err) {
+  // Find the data instance with the given phoneNumber and remove it from the database
+  Returner.findOneAndRemove({ phoneNumber: parsedPhoneNumber })
+    .then((deletedReturner) => {
+      if (!deletedReturner) {
+        return res.status(404).json({ message: "Returner not found" });
+      }
+
+      // Return a success message to the client
+      res.json({ message: "Returner deleted successfully" });
+    })
+    .catch((err) => {
       return res.status(500).json({ error: err });
-    }
-
-    if (!deletedReturner) {
-      return res.status(404).json({ message: "Returner not found" });
-    }
-
-    // Return a success message to the client
-    res.json({ message: "Returner deleted successfully" });
-  });
+    });
 });
 
 
 router.get("/getreturner/:phoneNumber", (req, res) => {
   const { phoneNumber } = req.params;
 
-  // Check if phoneNumber is a valid ObjectId
-  if (!mongoose.Types.ObjectId.isValid(phoneNumber)) {
+  // Check if phoneNumber is a valid number
+  if (isNaN(phoneNumber)) {
     return res.status(400).json({ message: "Invalid phoneNumber" });
   }
 
-  // Find the data instance with the given ID in the database
-  Returner.findById(phoneNumber, (err, returner) => {
-    if (err) {
-      return res.status(500).json({ error: err });
-    }
-
-    if (!returner) {
-      return res.status(404).json({ message: "Returner not found" });
-    }
-
-    // Return the data instance to the client
-    res.json(returner);
-  });
+  // Find the data instance with the given phoneNumber in the database
+  Returner.findOne({ phoneNumber })
+    .then((returner) => {
+      if (!returner) {
+        return res.status(404).json({ message: "Returner not found" });
+      }
+      res.json(returner);
+    })
+    .catch((err) => {
+      res.status(500).json({ error: err });
+    });
 });
+
 
 
 module.exports = router;
